@@ -67,6 +67,6 @@ def webhook():
 
 if __name__ == "__main__":
     bot.remove_webhook()
-    bot.set_webhook(url=f"https://your-render-app-url/{TOKEN}")  # ⚠️ Apni Render App URL dalna!
+    bot.set_webhook(url=f"https://youtube-data-bot-10.onrender.com/{TOKEN}")  # ⚠️ Apni Render App URL dalna!
     app.run(host="0.0.0.0", port=5000)
     

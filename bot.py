@@ -81,7 +81,7 @@ def fetch_data(message):
                 batch = results[i:i+50]
                 result_message = "\n".join(batch)
                 bot.send_message(message.chat.id, result_message)
-                time.sleep(4)  # ✅ 4 second ka delay
+                time.sleep(4)  # ✅ 4 second ka delay to avoid API spam
         else:
             bot.send_message(message.chat.id, "No channels found.")
     except ValueError:
@@ -102,6 +102,7 @@ def webhook():
 
 if __name__ == "__main__":
     bot.remove_webhook()
+    time.sleep(1)
     bot.set_webhook(url=f"https://youtube-data-bot-10.onrender.com/{TOKEN}")  # ✅ Apni actual Render App URL dalni hogi
-    app.run(host="0.0.0.0", port=5000)
-                
+    app.run(host="0.0.0.0", port=int(os.getenv("PORT", 5000)))
+                           

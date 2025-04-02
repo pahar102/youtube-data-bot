@@ -1,4 +1,4 @@
- import os
+import os
 import time
 import telebot
 import requests
@@ -11,7 +11,6 @@ YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
 
 if not TOKEN:
     raise ValueError("❌ ERROR: TELEGRAM BOT TOKEN NOT FOUND!")
-
 if not YOUTUBE_API_KEY:
     raise ValueError("❌ ERROR: YOUTUBE API KEY NOT FOUND!")
 
@@ -53,9 +52,7 @@ def get_youtube_channels(niche, min_subs, max_subs, country):
                 channels.append(f"{title} - {url} ({subs} subscribers)")
                 collected_results += 1
 
-        # ✅ Next page ke liye token update karna
         next_page_token = response.get("nextPageToken")
-
         if not next_page_token:
             break  # ✅ Agar next page token nahi mila, to loop break kar do
     
@@ -96,7 +93,6 @@ def fetch_data(message):
 def home():
     return "✅ Bot is running!"
 
-# ✅ Webhook Setup
 @app.route(f"/{TOKEN}", methods=["POST"])
 def webhook():
     json_str = request.get_data().decode("UTF-8")
@@ -108,4 +104,4 @@ if __name__ == "__main__":
     bot.remove_webhook()
     bot.set_webhook(url=f"https://youtube-data-bot-10.onrender.com/{TOKEN}")  # ✅ Apni actual Render App URL dalni hogi
     app.run(host="0.0.0.0", port=5000)
-    
+     

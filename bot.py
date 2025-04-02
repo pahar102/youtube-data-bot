@@ -1,9 +1,8 @@
 import os
 import telebot
 import requests
-import threading
 from googleapiclient.discovery import build
-from flask import Flask
+from flask import Flask, request
 
 # ✅ Environment variables se tokens fetch karna
 TOKEN = os.getenv("TOKEN")
@@ -58,11 +57,16 @@ def fetch_data(message):
 def home():
     return "✅ Bot is running!"
 
-# ✅ Flask & Bot Polling Ek Saath Chalane Ke Liye Threading
-def run_flask():
-    app.run(host="0.0.0.0", port=5000)
+# ✅ Webhook Setup
+@app.route(f"/{TOKEN}", methods=["POST"])
+def webhook():
+    json_str = request.get_data().decode("UTF-8")
+    update = telebot.types.Update.de_json(json_str)
+    bot.process_new_updates([update])
+    return "✅ OK", 200
 
 if __name__ == "__main__":
-    threading.Thread(target=run_flask).start()
-    bot.polling(none_stop=True)
+    bot.remove_webhook()
+    bot.set_webhook(url=f"https://your-render-app-url/{TOKEN}")  # ⚠️ Apni Render App URL dalna!
+    app.run(host="0.0.0.0", port=5000)
     

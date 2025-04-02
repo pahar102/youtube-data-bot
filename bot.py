@@ -1,4 +1,5 @@
-import os
+ import os
+import time
 import telebot
 import requests
 from googleapiclient.discovery import build
@@ -20,28 +21,45 @@ app = Flask(__name__)
 def get_youtube_channels(niche, min_subs, max_subs, country):
     youtube = build("youtube", "v3", developerKey=YOUTUBE_API_KEY)
     query = f"{niche}"
-    request = youtube.search().list(
-        q=query, type="channel", part="snippet", maxResults=50, regionCode=country
-    )
-    response = request.execute()
     
     channels = []
-    for item in response.get("items", []):
-        channel_id = item["id"]["channelId"]
-        title = item["snippet"]["title"]
-        url = f"https://www.youtube.com/channel/{channel_id}"
-
-        # ✅ Subscribers count fetch karna
-        channel_data = youtube.channels().list(
-            id=channel_id, part="statistics"
-        ).execute()
-
-        subs = int(channel_data["items"][0]["statistics"]["subscriberCount"])
-
-        if min_subs <= subs <= max_subs:
-            channels.append(f"{title} - {url} ({subs} subscribers)")
+    next_page_token = None
+    max_results = 500  # ✅ Maximum 500 results collect karna
+    collected_results = 0
     
-    return channels[:500]
+    while collected_results < max_results:
+        request = youtube.search().list(
+            q=query, type="channel", part="snippet", maxResults=50,
+            regionCode=country, pageToken=next_page_token
+        )
+        response = request.execute()
+
+        for item in response.get("items", []):
+            if collected_results >= max_results:
+                break  # ✅ Agar 500 channels ho gaye, to loop se bahar aa jao
+            
+            channel_id = item["id"]["channelId"]
+            title = item["snippet"]["title"]
+            url = f"https://www.youtube.com/channel/{channel_id}"
+
+            # ✅ Subscribers count fetch karna
+            channel_data = youtube.channels().list(
+                id=channel_id, part="statistics"
+            ).execute()
+
+            subs = int(channel_data["items"][0]["statistics"]["subscriberCount"])
+
+            if min_subs <= subs <= max_subs:
+                channels.append(f"{title} - {url} ({subs} subscribers)")
+                collected_results += 1
+
+        # ✅ Next page ke liye token update karna
+        next_page_token = response.get("nextPageToken")
+
+        if not next_page_token:
+            break  # ✅ Agar next page token nahi mila, to loop break kar do
+    
+    return channels
 
 @bot.message_handler(commands=['start'])
 def start(message):
@@ -62,8 +80,11 @@ def fetch_data(message):
         results = get_youtube_channels(niche, min_subs, max_subs, country)
         
         if results:
-            for result in results[:10]:  # Limiting to 10 messages to avoid spam
-                bot.send_message(message.chat.id, result)
+            for i in range(0, len(results), 50):  # ✅ Har 50 results ek message me
+                batch = results[i:i+50]
+                result_message = "\n".join(batch)
+                bot.send_message(message.chat.id, result_message)
+                time.sleep(2)  # ✅ 2 second ka delay
         else:
             bot.send_message(message.chat.id, "No channels found.")
     except ValueError:
@@ -85,6 +106,6 @@ def webhook():
 
 if __name__ == "__main__":
     bot.remove_webhook()
-    bot.set_webhook(url=f"https://youtube-data-bot-11.onrender.com/{TOKEN}")  # ✅ Apni actual Render App URL dalni hogi
+    bot.set_webhook(url=f"https://youtube-data-bot-10.onrender.com/{TOKEN}")  # ✅ Apni actual Render App URL dalni hogi
     app.run(host="0.0.0.0", port=5000)
     

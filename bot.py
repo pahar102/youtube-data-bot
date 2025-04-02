@@ -1,11 +1,12 @@
+import os
 import telebot
-import requests
 
-# Bot aur YouTube API Keys
-BOT_TOKEN = "Your_Telegram_Bot_Token"
-YOUTUBE_API_KEY = "Your_Youtube_API_Key"
+BOT_TOKEN = os.getenv("BOT_TOKEN")  # Environment variable fetch karo
 
-bot = telebot.TeleBot(BOT_TOKEN)
+if not BOT_TOKEN:
+    raise ValueError("BOT_TOKEN is missing. Please set it in environment variables.")
+
+bot = telebot.TeleBot(BOT_TOKEN)  # Bot Initialize
 
 # Function jo YouTube API se data fetch karega
 def get_youtube_channels(niche, min_subs, max_subs, country):

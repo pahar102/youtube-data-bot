@@ -1,1 +1,1 @@
-pyTelegramBotAPI==4.26.0
+pip install requests pyTelegramBotAPI googleapiclient flask

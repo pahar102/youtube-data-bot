@@ -1,76 +1,65 @@
-import logging
-from googleapiclient.discovery import build
-from telegram import Update
-from telegram.ext import Updater, CommandHandler, CallbackContext
+import os
+import requests
+from telegram import Update, Bot
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
 
-# Configure the logger
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-                    level=logging.INFO)
-logger = logging.getLogger(__name__)
+# Load environment variables
+YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
-# API Keys
-TELEGRAM_API_KEY = 'YOUR_TELEGRAM_BOT_API_KEY'
-YOUTUBE_API_KEY = 'YOUR_YOUTUBE_API_KEY'
+bot = Bot(token=TELEGRAM_BOT_TOKEN)
 
-# Setup the YouTube API client
-youtube = build('youtube', 'v3', developerKey=YOUTUBE_API_KEY)
+def start(update: Update, context: CallbackContext):
+    update.message.reply_text("Send niche, subscriber range and country (e.g., tech, 5K-50K, US)")
 
-def start(update: Update, context: CallbackContext) -> None:
-    update.message.reply_text("Welcome! Type /search followed by your parameters: niche, subscribe range, country.")
-
-def search(update: Update, context: CallbackContext) -> None:
-    args = context.args
-    if len(args) < 3:
-        update.message.reply_text("Please provide niche, subscribe range (min-max), and country.")
-        return
-
-    niche, subscribe_range, country = args[0], args[1], args[2]
-    min_subs, max_subs = map(int, subscribe_range.split('-'))
-
-    search_result = youtube.search().list(
-        q=niche,
-        type="channel",
-        part="snippet",
-        maxResults=50
-    ).execute()
-
+# Function to get YouTube channels
+def get_youtube_channels(niche, min_subs, max_subs, country):
+    url = f"https://www.googleapis.com/youtube/v3/search?part=snippet&type=channel&q={niche}&regionCode={country}&maxResults=50&key={YOUTUBE_API_KEY}"
+    response = requests.get(url).json()
     channels = []
-    for item in search_result.get("items", []):
-        channel_id = item['snippet']['channelId']
-        channel_info = youtube.channels().list(
-            part="snippet,statistics",
-            id=channel_id
-        ).execute()
-        stats = channel_info['items'][0]['statistics']
-        subscribers = int(stats.get("subscriberCount", 0))
+    
+    for item in response.get("items", []):
+        channel_id = item["id"]["channelId"]
+        channel_title = item["snippet"]["title"]
+        channel_url = f"https://www.youtube.com/channel/{channel_id}"
         
-        if min_subs <= subscribers <= max_subs:
-            channels.append({
-                'title': item['snippet']['title'],
-                'channelId': channel_id,
-                'subscribers': subscribers,
-                'country': item['snippet'].get('country', 'N/A')
-            })
+        # Get subscriber count
+        stats_url = f"https://www.googleapis.com/youtube/v3/channels?part=statistics&id={channel_id}&key={YOUTUBE_API_KEY}"
+        stats_response = requests.get(stats_url).json()
+        subscriber_count = int(stats_response["items"][0]["statistics"]["subscriberCount"])
+        
+        if min_subs <= subscriber_count <= max_subs:
+            channels.append(f"{channel_title} - {channel_url} ({subscriber_count} subs)")
+        
+        if len(channels) >= 500:
+            break
+    
+    return channels
 
-    # Send the first 500 channels
-    for channel in channels[:500]:
-        update.message.reply_text(f"Channel: {channel['title']}\nSubscribers: {channel['subscribers']}\nCountry: {channel['country']}\nhttps://www.youtube.com/channel/{channel['channelId']}")
+def handle_message(update: Update, context: CallbackContext):
+    try:
+        text = update.message.text
+        niche, subs_range, country = text.split(",")
+        min_subs, max_subs = [int(s.replace("K", "000")) for s in subs_range.strip().split("-")]
+        
+        channels = get_youtube_channels(niche.strip(), min_subs, max_subs, country.strip().upper())
+        
+        if channels:
+            update.message.reply_text("\n".join(channels[:10]))  # Send first 10 results to avoid Telegram limit
+        else:
+            update.message.reply_text("No channels found.")
+    except Exception as e:
+        update.message.reply_text(f"Error: {str(e)}")
 
+# Main Function
 def main():
-    # Set up the Updater with your bot's token
-    updater = Updater(TELEGRAM_API_KEY)
-
-    # Get the dispatcher to register handlers
-    dispatcher = updater.dispatcher
-
-    # Add handlers for commands
-    dispatcher.add_handler(CommandHandler("start", start))
-    dispatcher.add_handler(CommandHandler("search", search))
-
-    # Start the Bot
+    updater = Updater(TELEGRAM_BOT_TOKEN, use_context=True)
+    dp = updater.dispatcher
+    dp.add_handler(CommandHandler("start", start))
+    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_message))
     updater.start_polling()
     updater.idle()
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
-  
+      

@@ -1,10 +1,19 @@
+import os
 import telebot
 import requests
+import threading
 from googleapiclient.discovery import build
 from flask import Flask
 
-TOKEN = "TELEGRAM_BOT_TOKEN"
-YOUTUBE_API_KEY = "YOUTUBE_API_KEY"
+# ✅ Environment variables se tokens fetch karna
+TOKEN = os.getenv("TOKEN")
+YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
+
+if not TOKEN:
+    raise ValueError("❌ ERROR: TELEGRAM BOT TOKEN NOT FOUND!")
+
+if not YOUTUBE_API_KEY:
+    raise ValueError("❌ ERROR: YOUTUBE API KEY NOT FOUND!")
 
 bot = telebot.TeleBot(TOKEN)
 app = Flask(__name__)
@@ -12,11 +21,13 @@ app = Flask(__name__)
 def get_youtube_channels(niche, min_subs, max_subs, country):
     youtube = build("youtube", "v3", developerKey=YOUTUBE_API_KEY)
     query = f"{niche}"
-    request = youtube.search().list(q=query, type="channel", part="snippet", maxResults=50, regionCode=country)
+    request = youtube.search().list(
+        q=query, type="channel", part="snippet", maxResults=50, regionCode=country
+    )
     response = request.execute()
     
     channels = []
-    for item in response["items"]:
+    for item in response.get("items", []):
         channel_id = item["id"]["channelId"]
         title = item["snippet"]["title"]
         url = f"https://www.youtube.com/channel/{channel_id}"
@@ -36,17 +47,22 @@ def fetch_data(message):
         results = get_youtube_channels(niche.strip(), min_subs, max_subs, country.strip())
         
         if results:
-            for result in results:
+            for result in results[:10]:  # Limiting to 10 messages to avoid spam
                 bot.send_message(message.chat.id, result)
         else:
             bot.send_message(message.chat.id, "No channels found.")
     except Exception as e:
         bot.send_message(message.chat.id, "Error: Invalid input format!")
 
-@app.route('/')
+@app.route("/", methods=["GET"])
 def home():
-    return "Bot is running!"
+    return "✅ Bot is running!"
+
+# ✅ Flask & Bot Polling Ek Saath Chalane Ke Liye Threading
+def run_flask():
+    app.run(host="0.0.0.0", port=5000)
 
 if __name__ == "__main__":
-    bot.polling()
-        
+    threading.Thread(target=run_flask).start()
+    bot.polling(none_stop=True)
+    

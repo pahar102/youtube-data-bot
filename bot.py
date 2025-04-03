@@ -4,12 +4,12 @@ import requests
 import time
 from flask import Flask, request
 
-# ✅ Bot Token Validation
+# ✅ Bot Token & API Key Validation
 TOKEN = os.getenv("TOKEN")
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
 
 if not TOKEN:
-    raise ValueError("Bot Token is missing! Set the TOKEN environment variable.")
+    raise ValueError("ERROR: Bot Token is missing! Set the TOKEN environment variable.")
 
 bot = telebot.TeleBot(TOKEN)
 app = Flask(__name__)
@@ -22,7 +22,7 @@ def home():
     return "Bot is running!"
 
 # ✅ Webhook Fix: POST aur GET methods dono allow kiye gaye hain
-@app.route(f'/{TOKEN}', methods=['POST', 'GET'])
+@app.route(f"/webhook/{TOKEN}", methods=['POST', 'GET'])
 def webhook():
     if request.method == "POST":
         json_str = request.get_data().decode('UTF-8')
@@ -109,6 +109,9 @@ def fetch_youtube_data(message):
     except Exception as e:
         bot.send_message(message.chat.id, f"Error: {str(e)}")
 
+# ✅ Gunicorn Server Fix for Production
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.getenv("PORT", 10000)))
-        
+    from waitress import serve
+    print("Starting production server...")
+    serve(app, host="0.0.0.0", port=int(os.getenv("PORT", 10000)))
+    

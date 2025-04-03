@@ -30,7 +30,7 @@ def get_youtube_channels(niche, min_subs, max_subs, country):
         "part": "snippet",
         "q": niche,
         "type": "channel",
-        "maxResults": 50,  # Per request limit
+        "maxResults": 50,
         "regionCode": country,
         "key": YOUTUBE_API_KEY
     }
@@ -43,16 +43,14 @@ def get_youtube_channels(niche, min_subs, max_subs, country):
             channel_name = item["snippet"]["title"]
             channel_link = f"https://www.youtube.com/channel/{channel_id}"
 
-            # Fetch Subscriber Count
             subs_count = get_subscriber_count(channel_id)
             if subs_count and min_subs <= subs_count <= max_subs:
                 channels.append(f"{channel_name} - {subs_count} Subs\n{channel_link}")
             
-            time.sleep(1)  # API Rate Limit ko manage karne ke liye
+            time.sleep(1)
     return channels
 
 def get_subscriber_count(channel_id):
-    """Fetch subscriber count for a given channel ID."""
     params = {
         "part": "statistics",
         "id": channel_id,
@@ -68,21 +66,19 @@ def get_subscriber_count(channel_id):
 @bot.message_handler(func=lambda message: True)
 def fetch_youtube_data(message):
     try:
-        data = message.text.split(',')
+        data = [x.strip() for x in message.text.split(',')]
         if len(data) != 4:
             bot.send_message(message.chat.id, "Invalid format! Use: niche, min_subs, max_subs, country")
             return
         
-        niche, min_subs, max_subs, country = data[0].strip(), int(data[1]), int(data[2]), data[3].strip()
+        niche, min_subs, max_subs, country = data[0], int(data[1]), int(data[2]), data[3]
         
         bot.send_message(message.chat.id, "Fetching data, please wait...")
         results = get_youtube_channels(niche, min_subs, max_subs, country)
         
         if results:
             for i in range(0, min(len(results), 500), 20):
-                batch = results[i:i+20]
-                result_message = "\n".join(batch)
-                bot.send_message(message.chat.id, result_message)
+                bot.send_message(message.chat.id, "\n".join(results[i:i+20]))
                 time.sleep(3)
         else:
             bot.send_message(message.chat.id, "No results found!")
@@ -94,5 +90,5 @@ def run_bot():
 
 if __name__ == "__main__":
     threading.Thread(target=run_bot, daemon=True).start()
-    app.run(host="0.0.0.0", port=10000)
-                         
+    app.run(host="0.0.0.0", port=int(os.getenv("PORT", 10000)))
+    

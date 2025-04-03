@@ -40,18 +40,21 @@ def get_youtube_channels(niche, min_subs, max_subs, country):
         "key": YOUTUBE_API_KEY
     }
 
-    response = requests.get(YOUTUBE_SEARCH_URL, params=params)
-    if response.status_code == 200:
-        data = response.json()
-        for item in data.get("items", []):
-            channel_id = item["id"].get("channelId")
-            channel_name = item["snippet"]["title"]
-            channel_link = f"https://www.youtube.com/channel/{channel_id}"
-
-            subs_count = get_subscriber_count(channel_id)
-            if subs_count and min_subs <= subs_count <= max_subs:
-                channels.append(f"{channel_name} - {subs_count} Subs\n{channel_link}")
-            
+    while len(channels) < 500:
+        response = requests.get(YOUTUBE_SEARCH_URL, params=params)
+        if response.status_code == 200:
+            data = response.json()
+            for item in data.get("items", []):
+                channel_id = item["id"].get("channelId")
+                channel_name = item["snippet"]["title"]
+                channel_link = f"https://www.youtube.com/channel/{channel_id}"
+                
+                subs_count = get_subscriber_count(channel_id)
+                if subs_count and min_subs <= subs_count <= max_subs:
+                    channels.append(f"{channel_name} - {subs_count} Subs\n{channel_link}")
+                
+                if len(channels) >= 500:
+                    break
             time.sleep(1)
     return channels
 
@@ -85,6 +88,7 @@ def fetch_youtube_data(message):
             for i in range(0, min(len(results), 500), 20):
                 bot.send_message(message.chat.id, "\n".join(results[i:i+20]))
                 time.sleep(3)
+            bot.send_message(message.chat.id, "Thank you! Data fetching complete.")
         else:
             bot.send_message(message.chat.id, "No results found!")
     except Exception as e:
@@ -92,4 +96,4 @@ def fetch_youtube_data(message):
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.getenv("PORT", 10000)))
-    
+                

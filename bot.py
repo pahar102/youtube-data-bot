@@ -3,15 +3,22 @@ import telebot
 import time
 import requests
 import sys
+from flask import Flask
+import threading
 
 # Bot Token (Environment Variable se le rahe hain)
 TOKEN = os.getenv("TOKEN")
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
 
 bot = telebot.TeleBot(TOKEN)
+app = Flask(__name__)
 
 YOUTUBE_SEARCH_URL = "https://www.googleapis.com/youtube/v3/search"
 YOUTUBE_CHANNEL_URL = "https://www.googleapis.com/youtube/v3/channels"
+
+@app.route('/')
+def home():
+    return "Bot is running!"
 
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
@@ -82,8 +89,10 @@ def fetch_youtube_data(message):
     except Exception as e:
         bot.send_message(message.chat.id, f"Error: {str(e)}")
 
-if __name__ == "__main__":
-    if os.getenv("RENDER"):  # Agar Render pe chal raha hai, to exit kar do
-        sys.exit(0)
+def run_bot():
     bot.infinity_polling()
-        
+
+if __name__ == "__main__":
+    threading.Thread(target=run_bot, daemon=True).start()
+    app.run(host="0.0.0.0", port=10000)
+                         

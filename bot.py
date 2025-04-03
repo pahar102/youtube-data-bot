@@ -26,25 +26,24 @@ if not API_KEYS:
 
 api_index = 0  
 
-# Initialize bot
-bot = telebot.TeleBot(BOT_TOKEN)
-app = Flask(__name__)
-
-# Function to switch API keys
 def get_youtube_service():
-    global api_index
     return build("youtube", "v3", developerKey=API_KEYS[api_index])
 
 def switch_api_key():
     global api_index, youtube
-    api_index = (api_index + 1) % len(API_KEYS)
-    youtube = get_youtube_service()
-    logger.info(f"Switched to API Key {api_index + 1}")
+    if api_index < len(API_KEYS) - 1:
+        api_index += 1
+        youtube = get_youtube_service()
+        logger.info(f"Switched to API Key {api_index + 1}")
+    else:
+        logger.error("All API keys have exceeded quota!")
+        raise Exception("Quota limit reached for all API keys")
 
-# Initialize YouTube API
+# Initialize bot & YouTube API
+bot = telebot.TeleBot(BOT_TOKEN)
 youtube = get_youtube_service()
+app = Flask(__name__)
 
-# Home route
 @app.route("/")
 def home():
     bot.remove_webhook()
@@ -52,14 +51,12 @@ def home():
     bot.set_webhook(url=f"{WEBHOOK_URL}/{BOT_TOKEN}")
     return "Bot is running with webhook set!"
 
-# Telegram Webhook
 @app.route(f"/{BOT_TOKEN}", methods=["POST"])
 def webhook():
     update = request.get_data().decode("utf-8")
     bot.process_new_updates([telebot.types.Update.de_json(update)])
     return "OK", 200
 
-# Command to fetch YouTube data
 @bot.message_handler(commands=["fetch"])
 def fetch_youtube_data(message):
     global api_index
@@ -79,7 +76,7 @@ def fetch_youtube_data(message):
                     q=niche,
                     type="channel",
                     part="snippet",
-                    maxResults=50,
+                    maxResults=20,
                     pageToken=next_page_token
                 ).execute()
 
@@ -87,33 +84,37 @@ def fetch_youtube_data(message):
                     channel_id = item["id"]["channelId"]
                     channel_name = item["snippet"]["title"]
                     channels.append(f"{channel_name}: https://www.youtube.com/channel/{channel_id}")
-
                     if len(channels) >= 500:
                         break
 
                 next_page_token = search_response.get("nextPageToken")
                 if not next_page_token:
                     break
+                time.sleep(1)  # Slow API usage
 
             except Exception as e:
                 if "quotaExceeded" in str(e):
-                    switch_api_key()
-                    bot.send_message(message.chat.id, f"⚠️ Quota exceeded! Switching to API Key {api_index + 1}...")
-                    time.sleep(1)
+                    try:
+                        switch_api_key()
+                        bot.send_message(message.chat.id, f"⚠️ Quota exceeded! Switched to API Key {api_index + 1}...")
+                        time.sleep(1)
+                    except Exception:
+                        bot.send_message(message.chat.id, "❌ All API keys exceeded quota! Try again later.")
+                        return
                 else:
                     bot.reply_to(message, f"Error: {str(e)}")
                     return
 
-        # Send results in batches of 20
         batch_size = 20
         for i in range(0, len(channels), batch_size):
             bot.send_message(message.chat.id, "\n".join(channels[i:i+batch_size]))
-            time.sleep(3)
+            time.sleep(2)
 
-        bot.send_message(message.chat.id, "✅ 500 YouTube channels sent!\nThank you! 😊")
+        bot.send_message(message.chat.id, "✅ 500 YouTube channels sent!")
 
     except Exception as e:
         bot.reply_to(message, f"Error: {str(e)}")
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.getenv("PORT", 5000)))
+    

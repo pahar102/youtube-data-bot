@@ -47,7 +47,10 @@ youtube = get_youtube_service()
 # Home route
 @app.route("/")
 def home():
-    return "Bot is running!"
+    bot.remove_webhook()
+    time.sleep(1)
+    bot.set_webhook(url=f"{WEBHOOK_URL}/{BOT_TOKEN}")
+    return "Bot is running with webhook set!"
 
 # Telegram Webhook
 @app.route(f"/{BOT_TOKEN}", methods=["POST"])
@@ -55,13 +58,6 @@ def webhook():
     update = request.get_data().decode("utf-8")
     bot.process_new_updates([telebot.types.Update.de_json(update)])
     return "OK", 200
-
-# Set webhook on startup
-@app.before_first_request
-def set_webhook():
-    bot.remove_webhook()
-    time.sleep(1)
-    bot.set_webhook(url=f"{WEBHOOK_URL}/{BOT_TOKEN}")
 
 # Command to fetch YouTube data
 @bot.message_handler(commands=["fetch"])
@@ -121,4 +117,3 @@ def fetch_youtube_data(message):
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.getenv("PORT", 5000)))
-    

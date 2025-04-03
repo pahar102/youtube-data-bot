@@ -4,9 +4,12 @@ import requests
 import time
 from flask import Flask, request
 
-# Bot Token (Environment Variable se le rahe hain)
+# ✅ Bot Token Validation
 TOKEN = os.getenv("TOKEN")
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
+
+if not TOKEN:
+    raise ValueError("Bot Token is missing! Set the TOKEN environment variable.")
 
 bot = telebot.TeleBot(TOKEN)
 app = Flask(__name__)
@@ -18,16 +21,22 @@ YOUTUBE_CHANNEL_URL = "https://www.googleapis.com/youtube/v3/channels"
 def home():
     return "Bot is running!"
 
-@app.route(f'/{TOKEN}', methods=['POST'])
+# ✅ Webhook Fix: POST aur GET methods dono allow kiye gaye hain
+@app.route(f'/{TOKEN}', methods=['POST', 'GET'])
 def webhook():
-    json_str = request.get_data().decode('UTF-8')
-    update = telebot.types.Update.de_json(json_str)
-    bot.process_new_updates([update])
-    return "", 200
+    if request.method == "POST":
+        json_str = request.get_data().decode('UTF-8')
+        update = telebot.types.Update.de_json(json_str)
+        bot.process_new_updates([update])
+        return "OK", 200
+    return "Webhook Set!", 200  # GET request ka response
 
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
-    bot.send_message(message.chat.id, "Send: niche, min_subs, max_subs, country\nExample: Technology, 1000, 10000, US")
+    bot.send_message(
+        message.chat.id, 
+        "Send: niche, min_subs, max_subs, country\nExample: Technology, 1000, 10000, US"
+    )
 
 def get_youtube_channels(niche, min_subs, max_subs, country):
     channels = []
@@ -55,7 +64,11 @@ def get_youtube_channels(niche, min_subs, max_subs, country):
                 
                 if len(channels) >= 500:
                     break
-            time.sleep(1)
+            time.sleep(1)  # API rate limit avoid karne ke liye
+        else:
+            print("YouTube API Error:", response.text)
+            break  # Agar API error de rahi hai to loop break kar do
+
     return channels
 
 def get_subscriber_count(channel_id):
@@ -91,9 +104,11 @@ def fetch_youtube_data(message):
             bot.send_message(message.chat.id, "Thank you! Data fetching complete.")
         else:
             bot.send_message(message.chat.id, "No results found!")
+    except ValueError:
+        bot.send_message(message.chat.id, "Error: min_subs and max_subs must be numbers!")
     except Exception as e:
         bot.send_message(message.chat.id, f"Error: {str(e)}")
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.getenv("PORT", 10000)))
-                
+        

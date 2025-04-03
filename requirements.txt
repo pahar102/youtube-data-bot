@@ -1,5 +1,2 @@
+python-telegram-bot
 requests
-pyTelegramBotAPI
-google-api-python-client
-Flask
-youtube-api

@@ -3,19 +3,28 @@ import time
 import telebot
 from flask import Flask, request
 from googleapiclient.discovery import build
+import logging
+
+# Logging setup
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Environment Variables
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-WEBHOOK_URL = os.getenv("WEBHOOK_URL")  # Example: https://your-app-name.onrender.com/
+WEBHOOK_URL = os.getenv("WEBHOOK_URL")  
 
-# API Key List (Rotate on Quota Exceeded)
-API_KEYS = [
+# API Key List
+API_KEYS = [key for key in [
     os.getenv("YOUTUBE_API_KEY_1"),
     os.getenv("YOUTUBE_API_KEY_2"),
     os.getenv("YOUTUBE_API_KEY_3"),
     os.getenv("YOUTUBE_API_KEY_4"),
-]
-api_index = 0
+] if key]  
+
+if not API_KEYS:
+    raise ValueError("No valid YouTube API keys found!")
+
+api_index = 0  
 
 # Initialize bot
 bot = telebot.TeleBot(BOT_TOKEN)
@@ -26,27 +35,33 @@ def get_youtube_service():
     global api_index
     return build("youtube", "v3", developerKey=API_KEYS[api_index])
 
+def switch_api_key():
+    global api_index, youtube
+    api_index = (api_index + 1) % len(API_KEYS)
+    youtube = get_youtube_service()
+    logger.info(f"Switched to API Key {api_index + 1}")
+
+# Initialize YouTube API
 youtube = get_youtube_service()
 
-# Home route (required for Render deployment)
+# Home route
 @app.route("/")
 def home():
     return "Bot is running!"
 
-# Telegram Webhook route
+# Telegram Webhook
 @app.route(f"/{BOT_TOKEN}", methods=["POST"])
 def webhook():
     update = request.get_data().decode("utf-8")
     bot.process_new_updates([telebot.types.Update.de_json(update)])
     return "OK", 200
 
-# Set webhook manually on startup
-@app.before_request
+# Set webhook on startup
+@app.before_first_request
 def set_webhook():
-    if not bot.get_webhook_info().url:
-        bot.remove_webhook()
-        time.sleep(1)
-        bot.set_webhook(url=f"{WEBHOOK_URL}/{BOT_TOKEN}")
+    bot.remove_webhook()
+    time.sleep(1)
+    bot.set_webhook(url=f"{WEBHOOK_URL}/{BOT_TOKEN}")
 
 # Command to fetch YouTube data
 @bot.message_handler(commands=["fetch"])
@@ -86,15 +101,14 @@ def fetch_youtube_data(message):
 
             except Exception as e:
                 if "quotaExceeded" in str(e):
-                    api_index = (api_index + 1) % len(API_KEYS)  # Switch to next API key
-                    youtube = get_youtube_service()
+                    switch_api_key()
                     bot.send_message(message.chat.id, f"⚠️ Quota exceeded! Switching to API Key {api_index + 1}...")
                     time.sleep(1)
                 else:
                     bot.reply_to(message, f"Error: {str(e)}")
                     return
 
-        # Send results in batches of 20 with 3-second gaps
+        # Send results in batches of 20
         batch_size = 20
         for i in range(0, len(channels), batch_size):
             bot.send_message(message.chat.id, "\n".join(channels[i:i+batch_size]))
@@ -107,4 +121,4 @@ def fetch_youtube_data(message):
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.getenv("PORT", 5000)))
-        
+    

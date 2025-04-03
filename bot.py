@@ -12,6 +12,7 @@ logger = logging.getLogger(__name__)
 # Environment Variables
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 WEBHOOK_URL = os.getenv("WEBHOOK_URL")  
+PORT = int(os.getenv("PORT", 10000))  # Render ke liye 10000 default port set
 
 # API Key List
 API_KEYS = [key for key in [
@@ -76,7 +77,7 @@ def fetch_youtube_data(message):
                     q=niche,
                     type="channel",
                     part="snippet",
-                    maxResults=20,
+                    maxResults=10,  # Reduce API usage
                     pageToken=next_page_token
                 ).execute()
 
@@ -90,7 +91,7 @@ def fetch_youtube_data(message):
                 next_page_token = search_response.get("nextPageToken")
                 if not next_page_token:
                     break
-                time.sleep(1)  # Slow API usage
+                time.sleep(2)  # Slow API usage
 
             except Exception as e:
                 if "quotaExceeded" in str(e):
@@ -105,7 +106,7 @@ def fetch_youtube_data(message):
                     bot.reply_to(message, f"Error: {str(e)}")
                     return
 
-        batch_size = 20
+        batch_size = 10
         for i in range(0, len(channels), batch_size):
             bot.send_message(message.chat.id, "\n".join(channels[i:i+batch_size]))
             time.sleep(2)
@@ -116,5 +117,5 @@ def fetch_youtube_data(message):
         bot.reply_to(message, f"Error: {str(e)}")
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.getenv("PORT", 5000)))
+    app.run(host="0.0.0.0", port=PORT)
     

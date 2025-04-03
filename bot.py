@@ -1,10 +1,8 @@
 import os
 import telebot
-import time
 import requests
-import sys
-from flask import Flask
-import threading
+import time
+from flask import Flask, request
 
 # Bot Token (Environment Variable se le rahe hain)
 TOKEN = os.getenv("TOKEN")
@@ -19,6 +17,13 @@ YOUTUBE_CHANNEL_URL = "https://www.googleapis.com/youtube/v3/channels"
 @app.route('/')
 def home():
     return "Bot is running!"
+
+@app.route(f'/{TOKEN}', methods=['POST'])
+def webhook():
+    json_str = request.get_data().decode('UTF-8')
+    update = telebot.types.Update.de_json(json_str)
+    bot.process_new_updates([update])
+    return "", 200
 
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
@@ -85,10 +90,6 @@ def fetch_youtube_data(message):
     except Exception as e:
         bot.send_message(message.chat.id, f"Error: {str(e)}")
 
-def run_bot():
-    bot.infinity_polling()
-
 if __name__ == "__main__":
-    threading.Thread(target=run_bot, daemon=True).start()
     app.run(host="0.0.0.0", port=int(os.getenv("PORT", 10000)))
     

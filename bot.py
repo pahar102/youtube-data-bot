@@ -2,10 +2,9 @@ import os
 import telebot
 import requests
 import time
-import threading
 from flask import Flask, request
 
-# Bot Token & API Key Validation
+# ✅ Environment Variables
 TOKEN = os.getenv("TOKEN")
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
 
@@ -18,21 +17,23 @@ app = Flask(__name__)
 YOUTUBE_SEARCH_URL = "https://www.googleapis.com/youtube/v3/search"
 YOUTUBE_CHANNEL_URL = "https://www.googleapis.com/youtube/v3/channels"
 
-# ✅ Webhook route ko sahi format me define kiya
-WEBHOOK_URL_PATH = "/webhook/" + TOKEN
+# ✅ Webhook Configuration
+WEBHOOK_URL_PATH = f"/webhook/{TOKEN}"
+WEBHOOK_URL = f"https://your-app-name.onrender.com{WEBHOOK_URL_PATH}"  # Change this to your Render URL
 
 @app.route('/')
 def home():
     return "Bot is running!"
 
-@app.route(WEBHOOK_URL_PATH, methods=['POST', 'GET'])
+@app.route(WEBHOOK_URL_PATH, methods=['POST'])
 def webhook():
-    if request.method == "POST":
+    try:
         json_str = request.get_data().decode('UTF-8')
         update = telebot.types.Update.de_json(json_str)
         bot.process_new_updates([update])
         return "OK", 200
-    return "Webhook Set!", 200
+    except Exception as e:
+        return f"Error: {str(e)}", 400
 
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
@@ -125,9 +126,11 @@ if __name__ == "__main__":
     from waitress import serve
     print("Starting production server...")
 
-    # ✅ Bot aur Flask ko alag-alag thread par run karne ka setup
-    thread = threading.Thread(target=lambda: bot.polling(none_stop=True))
-    thread.start()
+    # ✅ Webhook Set Karo
+    bot.remove_webhook()
+    time.sleep(1)
+    bot.set_webhook(url=https://youtube-data-bot.onrender.com)
 
+    # ✅ Flask Server Start Karo
     serve(app, host="0.0.0.0", port=int(os.getenv("PORT", 10000)))
-    
+            

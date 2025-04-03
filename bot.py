@@ -4,7 +4,7 @@ import requests
 import time
 from flask import Flask, request
 
-# ✅ Bot Token & API Key Validation
+# Bot Token & API Key Validation
 TOKEN = os.getenv("TOKEN")
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
 
@@ -21,7 +21,6 @@ YOUTUBE_CHANNEL_URL = "https://www.googleapis.com/youtube/v3/channels"
 def home():
     return "Bot is running!"
 
-# ✅ Webhook Fix: POST aur GET methods dono allow kiye gaye hain
 @app.route(f"/webhook/{TOKEN}", methods=['POST', 'GET'])
 def webhook():
     if request.method == "POST":
@@ -29,7 +28,7 @@ def webhook():
         update = telebot.types.Update.de_json(json_str)
         bot.process_new_updates([update])
         return "OK", 200
-    return "Webhook Set!", 200  # GET request ka response
+    return "Webhook Set!", 200
 
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
@@ -53,13 +52,20 @@ def get_youtube_channels(niche, min_subs, max_subs, country):
         response = requests.get(YOUTUBE_SEARCH_URL, params=params)
         if response.status_code == 200:
             data = response.json()
+            if "items" not in data:
+                print("ERROR: No 'items' key in API response:", data)
+                break
+
             for item in data.get("items", []):
                 channel_id = item["id"].get("channelId")
+                if not channel_id:
+                    continue
+                
                 channel_name = item["snippet"]["title"]
                 channel_link = f"https://www.youtube.com/channel/{channel_id}"
                 
                 subs_count = get_subscriber_count(channel_id)
-                if subs_count and min_subs <= subs_count <= max_subs:
+                if subs_count is not None and min_subs <= subs_count <= max_subs:
                     channels.append(f"{channel_name} - {subs_count} Subs\n{channel_link}")
                 
                 if len(channels) >= 500:
@@ -67,7 +73,7 @@ def get_youtube_channels(niche, min_subs, max_subs, country):
             time.sleep(1)  # API rate limit avoid karne ke liye
         else:
             print("YouTube API Error:", response.text)
-            break  # Agar API error de rahi hai to loop break kar do
+            break  # API error par loop stop
 
     return channels
 
@@ -82,6 +88,8 @@ def get_subscriber_count(channel_id):
         data = response.json()
         if "items" in data and data["items"]:
             return int(data["items"][0]["statistics"]["subscriberCount"])
+        else:
+            print("ERROR: No 'items' key in statistics response:", data)
     return None
 
 @bot.message_handler(func=lambda message: True)
@@ -103,15 +111,14 @@ def fetch_youtube_data(message):
                 time.sleep(3)
             bot.send_message(message.chat.id, "Thank you! Data fetching complete.")
         else:
-            bot.send_message(message.chat.id, "No results found!")
+            bot.send_message(message.chat.id, "No results found! (Check API Key, Quota, or Search Filters)")
     except ValueError:
         bot.send_message(message.chat.id, "Error: min_subs and max_subs must be numbers!")
     except Exception as e:
         bot.send_message(message.chat.id, f"Error: {str(e)}")
 
-# ✅ Gunicorn Server Fix for Production
 if __name__ == "__main__":
     from waitress import serve
     print("Starting production server...")
     serve(app, host="0.0.0.0", port=int(os.getenv("PORT", 10000)))
-    
+                

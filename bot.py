@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 # Environment Variables
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 WEBHOOK_URL = os.getenv("WEBHOOK_URL")  
-PORT = int(os.getenv("PORT", 10000))  # Render ke liye 10000 default port set
+PORT = int(os.getenv("PORT", 10000))  
 
 # API Key List
 API_KEYS = [key for key in [
@@ -20,7 +20,7 @@ API_KEYS = [key for key in [
     os.getenv("YOUTUBE_API_KEY_2"),
     os.getenv("YOUTUBE_API_KEY_3"),
     os.getenv("YOUTUBE_API_KEY_4"),
-] if key]  
+] if key]
 
 if not API_KEYS:
     raise ValueError("No valid YouTube API keys found!")
@@ -84,14 +84,25 @@ def fetch_youtube_data(message):
                 for item in search_response["items"]:
                     channel_id = item["id"]["channelId"]
                     channel_name = item["snippet"]["title"]
-                    channels.append(f"{channel_name}: https://www.youtube.com/channel/{channel_id}")
+
+                    # Fetch subscriber count
+                    channel_response = youtube.channels().list(
+                        part="statistics",
+                        id=channel_id
+                    ).execute()
+
+                    sub_count = int(channel_response["items"][0]["statistics"]["subscriberCount"])
+
+                    if min_subs <= sub_count <= max_subs:
+                        channels.append(f"{channel_name} ({sub_count} subs): https://www.youtube.com/channel/{channel_id}")
+
                     if len(channels) >= 500:
                         break
 
                 next_page_token = search_response.get("nextPageToken")
                 if not next_page_token:
                     break
-                time.sleep(2)  # Slow API usage
+                time.sleep(1)  # Optimize API usage
 
             except Exception as e:
                 if "quotaExceeded" in str(e):
@@ -109,7 +120,7 @@ def fetch_youtube_data(message):
         batch_size = 10
         for i in range(0, len(channels), batch_size):
             bot.send_message(message.chat.id, "\n".join(channels[i:i+batch_size]))
-            time.sleep(2)
+            time.sleep(1)
 
         bot.send_message(message.chat.id, "✅ 500 YouTube channels sent!")
 

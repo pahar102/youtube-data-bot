@@ -6,15 +6,27 @@ from googleapiclient.discovery import build
 
 # Environment Variables
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
 WEBHOOK_URL = os.getenv("WEBHOOK_URL")  # Example: https://your-app-name.onrender.com/
+
+# API Key List (Rotate on Quota Exceeded)
+API_KEYS = [
+    os.getenv("YOUTUBE_API_KEY_1"),
+    os.getenv("YOUTUBE_API_KEY_2"),
+    os.getenv("YOUTUBE_API_KEY_3"),
+    os.getenv("YOUTUBE_API_KEY_4"),
+]
+api_index = 0
 
 # Initialize bot
 bot = telebot.TeleBot(BOT_TOKEN)
 app = Flask(__name__)
 
-# YouTube API Setup
-youtube = build("youtube", "v3", developerKey=YOUTUBE_API_KEY)
+# Function to switch API keys
+def get_youtube_service():
+    global api_index
+    return build("youtube", "v3", developerKey=API_KEYS[api_index])
+
+youtube = get_youtube_service()
 
 # Home route (required for Render deployment)
 @app.route("/")
@@ -39,6 +51,7 @@ def set_webhook():
 # Command to fetch YouTube data
 @bot.message_handler(commands=["fetch"])
 def fetch_youtube_data(message):
+    global api_index
     try:
         args = message.text.split(" ", 4)
         if len(args) < 5:
@@ -50,25 +63,36 @@ def fetch_youtube_data(message):
         next_page_token = None
 
         while len(channels) < 500:
-            search_response = youtube.search().list(
-                q=niche,
-                type="channel",
-                part="snippet",
-                maxResults=50,
-                pageToken=next_page_token
-            ).execute()
+            try:
+                search_response = youtube.search().list(
+                    q=niche,
+                    type="channel",
+                    part="snippet",
+                    maxResults=50,
+                    pageToken=next_page_token
+                ).execute()
 
-            for item in search_response["items"]:
-                channel_id = item["id"]["channelId"]
-                channel_name = item["snippet"]["title"]
-                channels.append(f"{channel_name}: https://www.youtube.com/channel/{channel_id}")
+                for item in search_response["items"]:
+                    channel_id = item["id"]["channelId"]
+                    channel_name = item["snippet"]["title"]
+                    channels.append(f"{channel_name}: https://www.youtube.com/channel/{channel_id}")
 
-                if len(channels) >= 500:
+                    if len(channels) >= 500:
+                        break
+
+                next_page_token = search_response.get("nextPageToken")
+                if not next_page_token:
                     break
 
-            next_page_token = search_response.get("nextPageToken")
-            if not next_page_token:
-                break
+            except Exception as e:
+                if "quotaExceeded" in str(e):
+                    api_index = (api_index + 1) % len(API_KEYS)  # Switch to next API key
+                    youtube = get_youtube_service()
+                    bot.send_message(message.chat.id, f"⚠️ Quota exceeded! Switching to API Key {api_index + 1}...")
+                    time.sleep(1)
+                else:
+                    bot.reply_to(message, f"Error: {str(e)}")
+                    return
 
         # Send results in batches of 20 with 3-second gaps
         batch_size = 20
@@ -83,4 +107,4 @@ def fetch_youtube_data(message):
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.getenv("PORT", 5000)))
-    
+        

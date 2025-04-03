@@ -2,6 +2,7 @@ import os
 import telebot
 import requests
 import time
+import threading
 from flask import Flask, request
 
 # Bot Token & API Key Validation
@@ -17,11 +18,14 @@ app = Flask(__name__)
 YOUTUBE_SEARCH_URL = "https://www.googleapis.com/youtube/v3/search"
 YOUTUBE_CHANNEL_URL = "https://www.googleapis.com/youtube/v3/channels"
 
+# ✅ Webhook route ko sahi format me define kiya
+WEBHOOK_URL_PATH = "/webhook/" + TOKEN
+
 @app.route('/')
 def home():
     return "Bot is running!"
 
-@app.route(f"/webhook/{TOKEN}", methods=['POST', 'GET'])
+@app.route(WEBHOOK_URL_PATH, methods=['POST', 'GET'])
 def webhook():
     if request.method == "POST":
         json_str = request.get_data().decode('UTF-8')
@@ -120,5 +124,10 @@ def fetch_youtube_data(message):
 if __name__ == "__main__":
     from waitress import serve
     print("Starting production server...")
+
+    # ✅ Bot aur Flask ko alag-alag thread par run karne ka setup
+    thread = threading.Thread(target=lambda: bot.polling(none_stop=True))
+    thread.start()
+
     serve(app, host="0.0.0.0", port=int(os.getenv("PORT", 10000)))
-                
+    

@@ -1,19 +1,20 @@
+import os
 import telebot
 import time
 import requests
 
-# Bot Token
-TOKEN = "telegram_bot_token"
-YOUTUBE_API_KEY = "youtube_api_key"
+# Bot Token (Environment Variable se le rahe hain)
+TOKEN = os.getenv("TOKEN")
+YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
 
 bot = telebot.TeleBot(TOKEN)
 
 YOUTUBE_SEARCH_URL = "https://www.googleapis.com/youtube/v3/search"
+YOUTUBE_CHANNEL_URL = "https://www.googleapis.com/youtube/v3/channels"
 
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     bot.send_message(message.chat.id, "Send: niche, min_subs, max_subs, country\nExample: Technology, 1000, 10000, US")
-
 
 def get_youtube_channels(niche, min_subs, max_subs, country):
     channels = []
@@ -25,19 +26,36 @@ def get_youtube_channels(niche, min_subs, max_subs, country):
         "regionCode": country,
         "key": YOUTUBE_API_KEY
     }
-    
+
     response = requests.get(YOUTUBE_SEARCH_URL, params=params)
     if response.status_code == 200:
         data = response.json()
         for item in data.get("items", []):
             channel_id = item["id"].get("channelId")
-            channel_name = item["snippet"].get("title")
+            channel_name = item["snippet"]["title"]
             channel_link = f"https://www.youtube.com/channel/{channel_id}"
+
+            # Fetch Subscriber Count
+            subs_count = get_subscriber_count(channel_id)
+            if subs_count and min_subs <= subs_count <= max_subs:
+                channels.append(f"{channel_name} - {subs_count} Subs\n{channel_link}")
             
-            # Store channel info
-            channels.append(f"{channel_name} - {channel_link}")
+            time.sleep(1)  # API Rate Limit ko manage karne ke liye
     return channels
 
+def get_subscriber_count(channel_id):
+    """Fetch subscriber count for a given channel ID."""
+    params = {
+        "part": "statistics",
+        "id": channel_id,
+        "key": YOUTUBE_API_KEY
+    }
+    response = requests.get(YOUTUBE_CHANNEL_URL, params=params)
+    if response.status_code == 200:
+        data = response.json()
+        if "items" in data and data["items"]:
+            return int(data["items"][0]["statistics"]["subscriberCount"])
+    return None
 
 @bot.message_handler(func=lambda message: True)
 def fetch_youtube_data(message):
@@ -65,4 +83,4 @@ def fetch_youtube_data(message):
 
 if __name__ == "__main__":
     bot.infinity_polling()
-        
+            

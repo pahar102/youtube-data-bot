@@ -2,6 +2,7 @@ import os
 import telebot
 import time
 import requests
+import sys
 
 # Bot Token (Environment Variable se le rahe hain)
 TOKEN = os.getenv("TOKEN")
@@ -82,5 +83,7 @@ def fetch_youtube_data(message):
         bot.send_message(message.chat.id, f"Error: {str(e)}")
 
 if __name__ == "__main__":
+    if "RENDER" in os.environ:
+        sys.exit(0)  # Render ko forcefully exit kara do taaki open port scan na kare
     bot.infinity_polling()
-            
+    

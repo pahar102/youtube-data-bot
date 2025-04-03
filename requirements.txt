@@ -1,8 +1,4 @@
-pyTelegramBotAPI
-google-api-python-client
-google-auth
-google-auth-oauthlib
-google-auth-httplib2
-Flask
-waitress
-requests
+Flask==3.1.0
+google-api-python-client==2.166.0
+pyTelegramBotAPI==4.26.0
+gunicorn==21.2.0
